@@ -320,12 +320,64 @@ h1 .vs {
   margin-bottom: 16px;
 }
 
+.game-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.game-header-top h1 {
+  flex: 1;
+  text-align: left;
+  font-size: 1.4rem;
+}
+
+.game-timer {
+  font-size: 1.4rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+  color: var(--text);
+  transition: color 0.3s;
+  min-width: 60px;
+  text-align: center;
+}
+
+.game-timer.warn  { color: var(--present); }
+.game-timer.urgent { color: #e74c3c; animation: pulse-timer 1s ease-in-out infinite; }
+
+@keyframes pulse-timer {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.btn-give-up {
+  background: transparent;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-give-up:hover { background: #e74c3c; color: #fff; }
+.btn-give-up:disabled { opacity: 0.4; cursor: not-allowed; }
+
 #game-status-bar {
   font-size: 0.8rem;
   color: var(--text-muted);
   text-align: center;
   min-height: 1.2em;
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .boards {

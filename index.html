@@ -70,7 +70,11 @@
   <!-- ── Game ──────────────────────────────────────────────────────────────── -->
   <div id="screen-game" class="screen">
     <header class="game-header">
-      <h1>Wordle<span class="vs">VS</span></h1>
+      <div class="game-header-top">
+        <h1 id="game-title">Wordle<span class="vs">VS</span></h1>
+        <div id="game-timer" class="game-timer">5:00</div>
+        <button id="btn-give-up" class="btn-give-up">Give Up</button>
+      </div>
       <div id="game-status-bar"></div>
     </header>
 

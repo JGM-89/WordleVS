@@ -161,17 +161,34 @@ export function setOpponentLabel(name) {
 
 // ── Results screen ─────────────────────────────────────────────────────────────
 
-export function renderResults({ outcome, secretWord, selfGuesses, opponentGuesses }) {
+export function renderResults({ outcome, secretWord, selfGuesses, opponentGuesses, timerExpired, gaveUp, selfId }) {
   const headline = document.getElementById('result-headline');
 
-  if (outcome === 'win') {
-    headline.textContent = '🎉 You Win!';
+  if (gaveUp === selfId) {
+    headline.textContent = 'You Gave Up';
+    headline.className = 'result-headline lose';
+  } else if (gaveUp) {
+    headline.textContent = 'Opponent Gave Up — You Win!';
+    headline.className = 'result-headline win';
+  } else if (timerExpired) {
+    if (outcome === 'win') {
+      headline.textContent = "Time's Up — You Win!";
+      headline.className = 'result-headline win';
+    } else if (outcome === 'lose') {
+      headline.textContent = "Time's Up — Opponent Wins";
+      headline.className = 'result-headline lose';
+    } else {
+      headline.textContent = "Time's Up — Draw!";
+      headline.className = 'result-headline draw';
+    }
+  } else if (outcome === 'win') {
+    headline.textContent = 'You Win!';
     headline.className = 'result-headline win';
   } else if (outcome === 'lose') {
     headline.textContent = 'Opponent Wins!';
     headline.className = 'result-headline lose';
   } else {
-    headline.textContent = "It's a Draw";
+    headline.textContent = "It's a Draw — Neither Solved It";
     headline.className = 'result-headline draw';
   }
 

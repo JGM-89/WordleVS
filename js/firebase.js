@@ -92,7 +92,27 @@ export async function joinRoom(shortCode, guestId) {
 }
 
 export async function activateRoom(roomId) {
-  await update(ref(db, `rooms/${roomId}`), { status: 'active' });
+  await update(ref(db, `rooms/${roomId}`), { status: 'active', startedAt: Date.now() });
+}
+
+export async function expireGame(roomId, winnerId) {
+  const snap = await get(ref(db, `rooms/${roomId}/status`));
+  if (snap.val() === 'finished') return; // already ended
+  await update(ref(db, `rooms/${roomId}`), {
+    status:       'finished',
+    winner:       winnerId ?? null,
+    timerExpired: true,
+  });
+}
+
+export async function giveUp(roomId, loserId, winnerId) {
+  const snap = await get(ref(db, `rooms/${roomId}/status`));
+  if (snap.val() === 'finished') return;
+  await update(ref(db, `rooms/${roomId}`), {
+    status:  'finished',
+    winner:  winnerId,
+    gaveUp:  loserId,
+  });
 }
 
 export async function submitGuess(roomId, playerId, rowIndex, word, result) {
@@ -104,21 +124,22 @@ export async function setPlayerDone(roomId, playerId, won) {
   const updates = { [`players/${playerId}/done`]: true };
 
   if (won) {
-    const roomSnap = await get(ref(db, `rooms/${roomId}/winner`));
-    // Only set winner if not already set (first-writer-wins)
-    if (!roomSnap.exists() || roomSnap.val() === null) {
+    const winnerSnap = await get(ref(db, `rooms/${roomId}/winner`));
+    if (!winnerSnap.exists() || winnerSnap.val() === null) {
       updates.winner = playerId;
       updates.status = 'finished';
     }
   } else {
-    // Check if opponent is also done — if so, finish the game as a draw
+    // Check if all other players are already done — if so, end as draw (no winner)
     const snap = await get(ref(db, `rooms/${roomId}/players`));
     const players = snap.val() || {};
-    const allDone = Object.values(players).every(p => p.done || p.id === playerId);
-    if (allDone) {
+    const allOthersDone = Object.entries(players)
+      .filter(([id]) => id !== playerId)
+      .every(([, p]) => p.done);
+    if (allOthersDone) {
       const winnerSnap = await get(ref(db, `rooms/${roomId}/winner`));
       if (!winnerSnap.exists() || winnerSnap.val() === null) {
-        updates.status = 'finished';
+        updates.status = 'finished'; // draw — no winner set
       }
     }
   }

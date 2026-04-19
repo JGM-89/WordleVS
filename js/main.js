@@ -3,6 +3,7 @@ import {
   createRoom, joinRoom, activateRoom,
   submitGuess as fbSubmitGuess,
   setPlayerDone, subscribeToRoom, unsubscribeRoom,
+  expireGame, giveUp,
 } from './firebase.js';
 import {
   showScreen, initBoard, setTileLetter, revealRow, bounceRow, shakeRow,
@@ -19,6 +20,8 @@ if (!playerId) {
 }
 
 // ── App state ──────────────────────────────────────────────────────────────────
+const GAME_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
 const state = {
   roomId:          null,
   shortCode:       null,
@@ -32,6 +35,9 @@ const state = {
   done:            false,
   opponentDone:    false,
   lastOpponentRow: -1,     // last opponent row we've rendered
+  timerInterval:   null,
+  startedAt:       null,
+  lastRoom:        null,   // cached room snapshot for timer expiry
 };
 
 // ── Board DOM references ───────────────────────────────────────────────────────
@@ -58,6 +64,16 @@ document.getElementById('btn-copy').addEventListener('click', () => {
   }).catch(() => {
     showToast(state.shortCode, 3000);
   });
+});
+
+// ── Give up ────────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-give-up').addEventListener('click', async () => {
+  if (state.done || !state.roomId) return;
+  const btn = document.getElementById('btn-give-up');
+  btn.disabled = true;
+  const opponentId = getOpponentIdFromState();
+  await giveUp(state.roomId, playerId, opponentId).catch(console.error);
 });
 
 // ── Results screen ─────────────────────────────────────────────────────────────
@@ -170,6 +186,7 @@ async function handleJoin() {
 function onRoomUpdate(snapshot) {
   if (!snapshot.exists()) return;
   const room = snapshot.val();
+  state.lastRoom = room;
 
   // Host detects guest joined → activate the room
   if (state.role === 'host' && room.status === 'waiting' && room.guestId) {
@@ -222,14 +239,85 @@ function startGame(room) {
 
   showScreen('game');
   const badge = state.hardMode ? ' <span class="hard-mode-badge">Hard</span>' : '';
-  document.querySelector('#screen-game header h1').innerHTML = `Wordle<span class="vs">VS</span>${badge}`;
+  document.getElementById('game-title').innerHTML = `Wordle<span class="vs">VS</span>${badge}`;
+  document.getElementById('btn-give-up').disabled = false;
   setGameStatus('');
   syncOpponentBoard(room);
+  startTimer(room.startedAt);
 
   if (state.done) {
     state.inputLocked = true;
     setGameStatus('Waiting for opponent to finish…');
   }
+}
+
+// ── Timer ──────────────────────────────────────────────────────────────────────
+
+function startTimer(startedAt) {
+  stopTimer();
+  state.startedAt = startedAt;
+
+  function tick() {
+    const remaining = Math.max(0, GAME_DURATION_MS - (Date.now() - state.startedAt));
+    const totalSecs = Math.ceil(remaining / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+
+    const el = document.getElementById('game-timer');
+    if (el) {
+      el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+      el.classList.remove('warn', 'urgent');
+      if (totalSecs <= 30) el.classList.add('urgent');
+      else if (totalSecs <= 60) el.classList.add('warn');
+    }
+
+    if (remaining === 0) {
+      stopTimer();
+      onTimerExpired();
+    }
+  }
+
+  tick();
+  state.timerInterval = setInterval(tick, 500);
+}
+
+function stopTimer() {
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
+}
+
+function onTimerExpired() {
+  if (!state.roomId) return;
+  state.inputLocked = true;
+  const room = state.lastRoom;
+  if (!room || room.status === 'finished') return;
+
+  const opponentId = getOpponentIdFromState();
+  const myGreens  = countBestGreens(room.players?.[playerId]);
+  const oppGreens = countBestGreens(room.players?.[opponentId]);
+
+  let winnerId = null;
+  if (myGreens > oppGreens) winnerId = playerId;
+  else if (oppGreens > myGreens) winnerId = opponentId;
+
+  expireGame(state.roomId, winnerId).catch(console.error);
+}
+
+function countBestGreens(playerData) {
+  const guesses = playerData?.guesses ?? {};
+  let best = 0;
+  for (const g of Object.values(guesses)) {
+    const greens = g.result.filter(s => s === 'correct').length;
+    if (greens > best) best = greens;
+  }
+  return best;
+}
+
+function getOpponentIdFromState() {
+  if (!state.lastRoom) return null;
+  return state.role === 'host' ? state.lastRoom.guestId : state.lastRoom.hostId;
 }
 
 // ── Sync opponent board ────────────────────────────────────────────────────────
@@ -394,11 +482,15 @@ function showResults(room) {
 
   renderResults({
     outcome,
-    secretWord: room.secretWord,
+    secretWord:      room.secretWord,
     selfGuesses,
     opponentGuesses: oppGuesses,
+    timerExpired:    room.timerExpired ?? false,
+    gaveUp:          room.gaveUp ?? null,
+    selfId:          playerId,
   });
 
+  stopTimer();
   showScreen('results');
   unsubscribeRoom();
 }
@@ -406,11 +498,13 @@ function showResults(room) {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function resetState() {
+  stopTimer();
   Object.assign(state, {
     roomId: null, shortCode: null, role: null, secretWord: null,
     hardMode: false, guessHistory: [],
     currentRow: 0, currentTiles: [], inputLocked: false,
     done: false, opponentDone: false, lastOpponentRow: -1,
+    timerInterval: null, startedAt: null, lastRoom: null,
   });
   document.getElementById('input-code').value = '';
   document.getElementById('btn-join').disabled = false;
