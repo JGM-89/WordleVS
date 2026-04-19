@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>WordleVS — Play Wordle Against a Friend</title>
+  <meta name="description" content="Competitive two-player Wordle. Share an invite code and race to guess the word first." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ── Landing ──────────────────────────────────────────────────────────── -->
+  <div id="screen-landing" class="screen active">
+    <header>
+      <h1>Wordle<span class="vs">VS</span></h1>
+      <p class="subtitle">Guess the word before your opponent does.</p>
+    </header>
+
+    <div class="landing-actions">
+      <button id="btn-create" class="btn btn-primary">Create Game</button>
+
+      <div class="divider"><span>or join a game</span></div>
+
+      <div class="join-form">
+        <input
+          id="input-code"
+          type="text"
+          maxlength="6"
+          placeholder="Enter invite code"
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+          inputmode="text"
+        />
+        <button id="btn-join" class="btn btn-secondary">Join</button>
+        <p id="join-error" class="error-msg" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Lobby ─────────────────────────────────────────────────────────────── -->
+  <div id="screen-lobby" class="screen">
+    <header>
+      <h1>Wordle<span class="vs">VS</span></h1>
+    </header>
+
+    <div id="lobby-host" class="lobby-panel hidden">
+      <p class="lobby-label">Share this code with your friend:</p>
+      <div id="code-display" class="code-display" aria-label="Invite code"></div>
+      <button id="btn-copy" class="btn btn-secondary">Copy Code</button>
+    </div>
+
+    <div class="lobby-status">
+      <div class="spinner"></div>
+      <p id="lobby-status-text">Waiting for opponent…</p>
+    </div>
+  </div>
+
+  <!-- ── Game ──────────────────────────────────────────────────────────────── -->
+  <div id="screen-game" class="screen">
+    <header class="game-header">
+      <h1>Wordle<span class="vs">VS</span></h1>
+      <div id="game-status-bar"></div>
+    </header>
+
+    <div class="boards">
+      <div class="board-wrapper">
+        <div class="board-label">You</div>
+        <div id="board-self" class="board" role="grid" aria-label="Your board"></div>
+      </div>
+      <div class="board-divider"></div>
+      <div class="board-wrapper">
+        <div id="opponent-label" class="board-label">Opponent</div>
+        <div id="board-opponent" class="board" role="grid" aria-label="Opponent's board"></div>
+      </div>
+    </div>
+
+    <div id="keyboard" class="keyboard" role="group" aria-label="On-screen keyboard">
+      <div class="keyboard-row">
+        <button class="key" data-key="q">Q</button>
+        <button class="key" data-key="w">W</button>
+        <button class="key" data-key="e">E</button>
+        <button class="key" data-key="r">R</button>
+        <button class="key" data-key="t">T</button>
+        <button class="key" data-key="y">Y</button>
+        <button class="key" data-key="u">U</button>
+        <button class="key" data-key="i">I</button>
+        <button class="key" data-key="o">O</button>
+        <button class="key" data-key="p">P</button>
+      </div>
+      <div class="keyboard-row">
+        <button class="key" data-key="a">A</button>
+        <button class="key" data-key="s">S</button>
+        <button class="key" data-key="d">D</button>
+        <button class="key" data-key="f">F</button>
+        <button class="key" data-key="g">G</button>
+        <button class="key" data-key="h">H</button>
+        <button class="key" data-key="j">J</button>
+        <button class="key" data-key="k">K</button>
+        <button class="key" data-key="l">L</button>
+      </div>
+      <div class="keyboard-row">
+        <button class="key key-wide" data-key="Enter">Enter</button>
+        <button class="key" data-key="z">Z</button>
+        <button class="key" data-key="x">X</button>
+        <button class="key" data-key="c">C</button>
+        <button class="key" data-key="v">V</button>
+        <button class="key" data-key="b">B</button>
+        <button class="key" data-key="n">N</button>
+        <button class="key" data-key="m">M</button>
+        <button class="key key-wide" data-key="Backspace">⌫</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Results ────────────────────────────────────────────────────────────── -->
+  <div id="screen-results" class="screen">
+    <header>
+      <h1>Wordle<span class="vs">VS</span></h1>
+    </header>
+
+    <div class="results-panel">
+      <div id="result-headline" class="result-headline"></div>
+      <p class="result-word-label">The word was</p>
+      <div id="result-word" class="result-word"></div>
+      <div id="result-stats" class="result-stats"></div>
+      <div class="results-actions">
+        <button id="btn-play-again" class="btn btn-primary">Play Again</button>
+        <button id="btn-home" class="btn btn-secondary">Home</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container" aria-live="assertive" aria-atomic="true"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
