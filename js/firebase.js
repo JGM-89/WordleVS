@@ -95,6 +95,40 @@ export async function activateRoom(roomId) {
   await update(ref(db, `rooms/${roomId}`), { status: 'active', startedAt: Date.now() });
 }
 
+export async function createRematch(oldRoomId, hostId, guestId, secretWord, hardMode) {
+  const shortCode = generateShortCode();
+  const roomRef   = push(ref(db, 'rooms'));
+  const newRoomId = roomRef.key;
+
+  await set(roomRef, {
+    secretWord,
+    hostId,
+    guestId,
+    shortCode,
+    hardMode:     hardMode ?? false,
+    status:       'active',
+    startedAt:    Date.now(),
+    winner:       null,
+    timerExpired: false,
+    gaveUp:       null,
+    createdAt:    Date.now(),
+    players: {
+      [hostId]:  { guesses: {}, currentRow: 0, done: false },
+      [guestId]: { guesses: {}, currentRow: 0, done: false },
+    },
+  });
+
+  // Signal the old room so the other player auto-joins
+  await update(ref(db, `rooms/${oldRoomId}`), { rematch: newRoomId });
+
+  return { roomId: newRoomId, shortCode };
+}
+
+export async function getRematch(oldRoomId) {
+  const snap = await get(ref(db, `rooms/${oldRoomId}/rematch`));
+  return snap.exists() ? snap.val() : null;
+}
+
 export async function expireGame(roomId, winnerId) {
   const snap = await get(ref(db, `rooms/${roomId}/status`));
   if (snap.val() === 'finished') return; // already ended

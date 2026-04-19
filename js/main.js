@@ -3,7 +3,7 @@ import {
   createRoom, joinRoom, activateRoom,
   submitGuess as fbSubmitGuess,
   setPlayerDone, subscribeToRoom, unsubscribeRoom,
-  expireGame, giveUp,
+  expireGame, giveUp, createRematch, getRematch,
 } from './firebase.js';
 import {
   showScreen, initBoard, setTileLetter, revealRow, bounceRow, shakeRow,
@@ -85,10 +85,38 @@ document.getElementById('btn-home').addEventListener('click', () => {
 });
 
 document.getElementById('btn-play-again').addEventListener('click', async () => {
-  unsubscribeRoom();
-  resetState();
-  await handleCreate();
-  showToast('New game created — share the code!', 2500);
+  const btn = document.getElementById('btn-play-again');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  const oldRoomId = state.roomId;
+  const oldRoom   = state.lastRoom;
+
+  try {
+    // Check if the other player already created a rematch room
+    const existingRematchId = await getRematch(oldRoomId);
+
+    if (existingRematchId) {
+      // Other player was first — just join their room
+      await joinRematch(existingRematchId, oldRoom);
+    } else {
+      // We're first — create the rematch room for both players
+      const secret  = selectSecretWord();
+      const { roomId } = await createRematch(
+        oldRoomId,
+        oldRoom.hostId,
+        oldRoom.guestId,
+        secret,
+        oldRoom.hardMode ?? false,
+      );
+      await joinRematch(roomId, oldRoom);
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Could not start rematch. Try again.');
+    btn.disabled = false;
+    btn.textContent = 'Play Again';
+  }
 });
 
 // ── Keyboard input ─────────────────────────────────────────────────────────────
@@ -187,6 +215,12 @@ function onRoomUpdate(snapshot) {
   if (!snapshot.exists()) return;
   const room = snapshot.val();
   state.lastRoom = room;
+
+  // Auto-join rematch if the other player created one while we're on the results screen
+  if (room.rematch && document.getElementById('screen-results').classList.contains('active')) {
+    joinRematch(room.rematch, room).catch(console.error);
+    return;
+  }
 
   // Host detects guest joined → activate the room
   if (state.role === 'host' && room.status === 'waiting' && room.guestId) {
@@ -492,10 +526,30 @@ function showResults(room) {
 
   stopTimer();
   showScreen('results');
-  unsubscribeRoom();
+  // Keep Firebase subscription alive so we can detect a rematch request
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+async function joinRematch(newRoomId, oldRoom) {
+  unsubscribeRoom();
+
+  // Preserve role from the old room
+  const newRole = oldRoom.hostId === playerId ? 'host' : 'guest';
+
+  // Reset gameplay state, keep identity
+  Object.assign(state, {
+    roomId: newRoomId, shortCode: null, role: newRole,
+    secretWord: null, hardMode: oldRoom.hardMode ?? false,
+    guessHistory: [],
+    currentRow: 0, currentTiles: [], inputLocked: false,
+    done: false, opponentDone: false, lastOpponentRow: -1,
+    timerInterval: null, startedAt: null, lastRoom: null,
+  });
+
+  subscribeToRoom(newRoomId, onRoomUpdate);
+  // onRoomUpdate will fire with status:'active' and call startGame automatically
+}
 
 function resetState() {
   stopTimer();
