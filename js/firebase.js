@@ -6,7 +6,7 @@
 const FIREBASE_CONFIG = {
   apiKey:            'AIzaSyABy1JFawubYy4q27zTNxicMjeBRX45kZ0',
   authDomain:        'wordlevs-b124a.firebaseapp.com',
-  databaseURL:       'https://wordlevs-b124a-default-rtdb.firebaseio.com',
+  databaseURL:       'https://wordlevs-b124a-default-rtdb.europe-west1.firebasedatabase.app',
   projectId:         'wordlevs-b124a',
   storageBucket:     'wordlevs-b124a.firebasestorage.app',
   messagingSenderId: '240769060851',
