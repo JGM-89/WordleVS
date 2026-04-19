@@ -24,6 +24,8 @@ const state = {
   shortCode:       null,
   role:            null,   // 'host' | 'guest'
   secretWord:      null,
+  hardMode:        false,
+  guessHistory:    [],     // { word, result }[] — own guesses so far
   currentRow:      0,
   currentTiles:    [],     // letters typed in the current row
   inputLocked:     false,  // true while animation plays or game is over
@@ -89,12 +91,13 @@ document.getElementById('keyboard').addEventListener('click', e => {
 // ── Flow: Create Game ──────────────────────────────────────────────────────────
 
 async function handleCreate() {
-  const secret = selectSecretWord();
+  const secret   = selectSecretWord();
+  const hardMode = document.getElementById('toggle-hard').checked;
   showScreen('lobby');
   setLobbyStatus('Waiting for opponent…');
 
   try {
-    const { roomId, shortCode } = await createRoom(playerId, secret);
+    const { roomId, shortCode } = await createRoom(playerId, secret, hardMode);
     state.roomId    = roomId;
     state.shortCode = shortCode;
     state.role      = 'host';
@@ -198,25 +201,28 @@ function startGame(room) {
   initBoard(boardSelf, false);
   initBoard(boardOpponent, true);
 
+  state.hardMode     = room.hardMode ?? false;
   state.currentRow   = room.players?.[playerId]?.currentRow ?? 0;
   state.currentTiles = [];
   state.inputLocked  = false;
   state.done         = room.players?.[playerId]?.done ?? false;
   state.lastOpponentRow = -1;
+  state.guessHistory = [];
 
   // Restore own guesses if reconnecting
   const myGuesses = room.players?.[playerId]?.guesses ?? {};
-  const myHistory = [];
   for (let r = 0; r < state.currentRow; r++) {
     const g = myGuesses[r];
     if (g) {
-      myHistory.push(g);
+      state.guessHistory.push(g);
       revealRow(boardSelf, r, g.result, g.word.split(''), false, null);
       g.result.forEach((status, col) => setKeyColor(g.word[col], status));
     }
   }
 
   showScreen('game');
+  const badge = state.hardMode ? ' <span class="hard-mode-badge">Hard</span>' : '';
+  document.querySelector('#screen-game header h1').innerHTML = `Wordle<span class="vs">VS</span>${badge}`;
   setGameStatus('');
   syncOpponentBoard(room);
 
@@ -275,6 +281,23 @@ function handleKey(key) {
 
 const COLS = 5;
 
+// Returns an error string if the word violates hard mode constraints, else null.
+function hardModeError(word) {
+  for (const { word: prev, result } of state.guessHistory) {
+    for (let i = 0; i < COLS; i++) {
+      if (result[i] === 'correct' && word[i] !== prev[i]) {
+        return `Position ${i + 1} must be ${prev[i].toUpperCase()}`;
+      }
+    }
+    for (let i = 0; i < COLS; i++) {
+      if (result[i] === 'present' && !word.includes(prev[i])) {
+        return `Guess must contain ${prev[i].toUpperCase()}`;
+      }
+    }
+  }
+  return null;
+}
+
 async function submitCurrentGuess() {
   const word = state.currentTiles.join('');
 
@@ -290,6 +313,15 @@ async function submitCurrentGuess() {
     return;
   }
 
+  if (state.hardMode) {
+    const err = hardModeError(word);
+    if (err) {
+      showToast(err);
+      shakeRow(boardSelf, state.currentRow);
+      return;
+    }
+  }
+
   const result = evaluateGuess(word, state.secretWord);
   const row    = state.currentRow;
 
@@ -301,6 +333,8 @@ async function submitCurrentGuess() {
     result.forEach((status, i) => setKeyColor(word[i], status));
 
     const won = result.every(s => s === 'correct');
+
+    state.guessHistory.push({ word, result });
 
     // Write guess to Firebase
     await fbSubmitGuess(state.roomId, playerId, row, word, result);
@@ -374,6 +408,7 @@ function showResults(room) {
 function resetState() {
   Object.assign(state, {
     roomId: null, shortCode: null, role: null, secretWord: null,
+    hardMode: false, guessHistory: [],
     currentRow: 0, currentTiles: [], inputLocked: false,
     done: false, opponentDone: false, lastOpponentRow: -1,
   });

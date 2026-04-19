@@ -37,7 +37,7 @@ function generateShortCode() {
 
 // ─── Room CRUD ─────────────────────────────────────────────────────────────────
 
-export async function createRoom(hostId, secretWord) {
+export async function createRoom(hostId, secretWord, hardMode = false) {
   const shortCode = generateShortCode();
 
   const roomRef  = push(ref(db, 'rooms'));
@@ -48,6 +48,7 @@ export async function createRoom(hostId, secretWord) {
     hostId,
     guestId:   null,
     shortCode,
+    hardMode,
     status:    'waiting',
     winner:    null,
     createdAt: Date.now(),
