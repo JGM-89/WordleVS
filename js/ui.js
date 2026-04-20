@@ -161,7 +161,35 @@ export function setOpponentLabel(name) {
 
 // ── Results screen ─────────────────────────────────────────────────────────────
 
-export function renderResults({ outcome, secretWord, selfGuesses, opponentGuesses, timerExpired, gaveUp, selfId }) {
+export function updateSeriesBar({ seriesFormat, seriesRound, seriesScores, selfId, opponentId }) {
+  const barEl = document.getElementById('series-bar');
+
+  if (!seriesFormat || seriesFormat <= 1) {
+    barEl.classList.add('hidden');
+    return;
+  }
+
+  const winsNeeded = Math.ceil(seriesFormat / 2);
+  const myScore    = (seriesScores ?? {})[selfId]     ?? 0;
+  const oppScore   = (seriesScores ?? {})[opponentId] ?? 0;
+
+  function makePips(score, winClass) {
+    return Array.from({ length: winsNeeded }, (_, i) =>
+      `<div class="series-pip ${i < score ? winClass : ''}"></div>`
+    ).join('');
+  }
+
+  barEl.innerHTML = `
+    <div class="series-pip-row">${makePips(myScore, 'won')}</div>
+    <span class="series-score-num ${myScore > oppScore ? 'leading' : ''}">${myScore}</span>
+    <span class="series-format-tag">G${seriesRound}/${seriesFormat}</span>
+    <span class="series-score-num ${oppScore > myScore ? 'leading' : ''}">${oppScore}</span>
+    <div class="series-pip-row">${makePips(oppScore, 'won-opp')}</div>
+  `;
+  barEl.classList.remove('hidden');
+}
+
+export function renderResults({ outcome, secretWord, selfGuesses, opponentGuesses, timerExpired, gaveUp, selfId, seriesFormat, seriesRound, seriesScores, opponentId }) {
   const headline = document.getElementById('result-headline');
 
   if (gaveUp === selfId) {
@@ -203,6 +231,28 @@ export function renderResults({ outcome, secretWord, selfGuesses, opponentGuesse
     inner.textContent = letter;
     tile.appendChild(inner);
     wordEl.appendChild(tile);
+  }
+
+  // Series score
+  const seriesEl = document.getElementById('result-series');
+  if (seriesFormat && seriesFormat > 1 && seriesScores && opponentId) {
+    const winsNeeded = Math.ceil(seriesFormat / 2);
+    const myScore    = (seriesScores[selfId]     ?? 0);
+    const oppScore   = (seriesScores[opponentId] ?? 0);
+    const seriesWon  = myScore  >= winsNeeded;
+    const seriesLost = oppScore >= winsNeeded;
+    const formatName = `Best of ${seriesFormat}`;
+
+    let seriesLine = `<strong>${formatName}</strong> — Game ${seriesRound}: `;
+    seriesLine    += `You <strong>${myScore}</strong> – <strong>${oppScore}</strong> Opponent`;
+    if (seriesWon)       seriesLine += `<br>You won the series! 🏆`;
+    else if (seriesLost) seriesLine += `<br>Opponent won the series`;
+    else                 seriesLine += `<br>Series continues…`;
+
+    seriesEl.innerHTML = seriesLine;
+    seriesEl.classList.remove('hidden');
+  } else {
+    seriesEl.classList.add('hidden');
   }
 
   // Stats

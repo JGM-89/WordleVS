@@ -16,7 +16,7 @@ const FIREBASE_CONFIG = {
 // ─── Firebase SDK (loaded via CDN in index.html as module scripts) ─────────────
 import { initializeApp }                         from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getDatabase, ref, set, get, push,
-         update, onValue, off, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+         update, onValue, off, increment } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
 const app = initializeApp(FIREBASE_CONFIG);
 const db  = getDatabase(app);
@@ -37,7 +37,7 @@ function generateShortCode() {
 
 // ─── Room CRUD ─────────────────────────────────────────────────────────────────
 
-export async function createRoom(hostId, secretWord, hardMode = false, timeLimitMs = 300000) {
+export async function createRoom(hostId, secretWord, hardMode = false, timeLimitMs = 300000, seriesFormat = 1) {
   const shortCode = generateShortCode();
 
   const roomRef  = push(ref(db, 'rooms'));
@@ -50,6 +50,9 @@ export async function createRoom(hostId, secretWord, hardMode = false, timeLimit
     shortCode,
     hardMode,
     timeLimitMs,
+    seriesFormat,
+    seriesRound:  1,
+    seriesScores: { [hostId]: 0 },
     status:       'waiting',
     winner:       null,
     createdAt:    Date.now(),
@@ -92,11 +95,13 @@ export async function joinRoom(shortCode, guestId) {
   return { roomId, room };
 }
 
-export async function activateRoom(roomId) {
-  await update(ref(db, `rooms/${roomId}`), { status: 'active', startedAt: Date.now() });
+export async function activateRoom(roomId, guestId) {
+  const updates = { status: 'active', startedAt: Date.now() };
+  if (guestId) updates[`seriesScores/${guestId}`] = 0;
+  await update(ref(db, `rooms/${roomId}`), updates);
 }
 
-export async function createRematch(oldRoomId, hostId, guestId, secretWord, hardMode, timeLimitMs) {
+export async function createRematch(oldRoomId, hostId, guestId, secretWord, hardMode, timeLimitMs, seriesFormat = 1, seriesRound = 1, seriesScores = {}) {
   const shortCode = generateShortCode();
   const roomRef   = push(ref(db, 'rooms'));
   const newRoomId = roomRef.key;
@@ -108,6 +113,9 @@ export async function createRematch(oldRoomId, hostId, guestId, secretWord, hard
     shortCode,
     hardMode:     hardMode ?? false,
     timeLimitMs:  timeLimitMs ?? 300000,
+    seriesFormat,
+    seriesRound,
+    seriesScores,
     status:       'active',
     startedAt:    Date.now(),
     winner:       null,

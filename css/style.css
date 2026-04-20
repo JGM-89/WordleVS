@@ -203,6 +203,99 @@ h1 .vs {
   transform: translateX(18px);
 }
 
+/* ── Format picker ─────────────────────────────────────────────────────────── */
+.format-row { cursor: default; }
+
+.format-picker {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.format-btn {
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-3);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.format-btn:hover { background: var(--border); color: var(--text); }
+
+.format-btn.active {
+  background: var(--correct);
+  border-color: var(--correct);
+  color: #fff;
+}
+
+/* ── Series score bar (in-game) ────────────────────────────────────────────── */
+.series-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 4px 0 2px;
+}
+
+.series-bar.hidden { display: none; }
+
+.series-score-num {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--text);
+  min-width: 18px;
+  text-align: center;
+}
+
+.series-score-num.leading { color: var(--correct); }
+
+.series-pip-row {
+  display: flex;
+  gap: 4px;
+}
+
+.series-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.series-pip.won { background: var(--correct); border-color: var(--correct); }
+.series-pip.won-opp { background: #e74c3c; border-color: #e74c3c; }
+
+.series-format-tag {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* ── Series result (results screen) ───────────────────────────────────────── */
+.result-series {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.result-series.hidden { display: none; }
+
+.result-series strong { color: var(--text); }
+
 .time-limit-row { cursor: default; }
 
 .time-limit-input-wrap {
@@ -732,16 +825,43 @@ h1 .vs {
   .key-wide { min-width: 46px; }
 }
 
-/* Stack boards vertically on very small or portrait screens that are narrow */
-@media (max-width: 360px) {
+/* ── Mobile: stack boards vertically ───────────────────────────────────────── */
+/* Stacking threshold: when two boards can't sit side-by-side (≈ phones)      */
+@media (max-width: 560px) {
   .boards {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1px auto;
-    gap: 16px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: 100%;
   }
 
+  /* Swap visual order: opponent (compact) on top, your board + keyboard below */
+  .boards .board-wrapper:first-child { order: 3; } /* You  → bottom  */
+  .board-divider                      { order: 2; } /* line → middle  */
+  .boards .board-wrapper:last-child   { order: 1; } /* Opp  → top     */
+
   .board-divider {
-    width: 100%;
+    width: 50%;
     height: 1px;
+    align-self: center;
   }
+
+  /* Opponent board: small coloured squares (no letters shown anyway) */
+  #board-opponent {
+    grid-template-rows: repeat(6, 22px);
+    grid-template-columns: repeat(5, 22px);
+    gap: 3px;
+  }
+
+  #board-opponent .tile {
+    width: 22px;
+    height: 22px;
+    border-width: 1px;
+  }
+
+  /* Keyboard keys: slightly narrower to avoid overflow */
+  .key      { min-width: 30px; height: 46px; }
+  .key-wide { min-width: 48px; }
+  .keyboard-row { gap: 4px; }
 }

@@ -30,6 +30,18 @@
         </div>
       </label>
 
+      <div class="toggle-row format-row">
+        <span class="toggle-label">
+          Format
+          <span class="toggle-hint">How many games to play</span>
+        </span>
+        <div class="format-picker" role="group" aria-label="Series format">
+          <button class="format-btn active" data-format="1">Single</button>
+          <button class="format-btn" data-format="3">Best of 3</button>
+          <button class="format-btn" data-format="5">Best of 5</button>
+        </div>
+      </div>
+
       <div class="toggle-row time-limit-row">
         <span class="toggle-label">
           Time Limit
@@ -95,6 +107,7 @@
         <div id="game-timer" class="game-timer">5:00</div>
         <button id="btn-give-up" class="btn-give-up">Give Up</button>
       </div>
+      <div id="series-bar" class="series-bar hidden" aria-live="polite"></div>
       <div id="game-status-bar"></div>
     </header>
 
@@ -158,6 +171,7 @@
       <div id="result-headline" class="result-headline"></div>
       <p class="result-word-label">The word was</p>
       <div id="result-word" class="result-word"></div>
+      <div id="result-series" class="result-series hidden"></div>
       <div id="result-stats" class="result-stats"></div>
       <div class="results-actions">
         <button id="btn-play-again" class="btn btn-primary">Play Again</button>

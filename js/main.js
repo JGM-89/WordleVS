@@ -8,7 +8,7 @@ import {
 import {
   showScreen, initBoard, setTileLetter, revealRow, bounceRow, shakeRow,
   setKeyColor, resetKeyboard, showLobbyHost, setLobbyStatus,
-  setGameStatus, setOpponentLabel, renderResults, showToast,
+  setGameStatus, setOpponentLabel, renderResults, updateSeriesBar, showToast,
   setJoinError, clearJoinError,
 } from './ui.js';
 
@@ -29,6 +29,10 @@ const state = {
   secretWord:      null,
   hardMode:        false,
   timeLimitMs:     DEFAULT_TIME_MS,
+  seriesFormat:    1,
+  seriesRound:     1,
+  seriesScores:    {},
+  seriesIsOver:    true,
   guessHistory:    [],     // { word, result }[] — own guesses so far
   currentRow:      0,
   currentTiles:    [],     // letters typed in the current row
@@ -58,6 +62,19 @@ document.getElementById('time-inc').addEventListener('click', () => {
   const input = document.getElementById('input-time');
   input.value = Math.min(60, (parseInt(input.value) || 0) + 1);
 });
+// ── Format picker ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.format-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+function getSeriesFormat() {
+  const active = document.querySelector('.format-btn.active');
+  return active ? parseInt(active.dataset.format, 10) : 1;
+}
+
 document.getElementById('btn-join').addEventListener('click', handleJoin);
 document.getElementById('input-code').addEventListener('keydown', e => {
   if (e.key === 'Enter') handleJoin();
@@ -103,16 +120,29 @@ document.getElementById('btn-play-again').addEventListener('click', async () => 
   const oldRoomId = state.roomId;
   const oldRoom   = state.lastRoom;
 
+  // Determine series continuation vs fresh start
+  const nextFormat = state.seriesFormat;
+  let nextRound, nextScores;
+  if (!state.seriesIsOver && nextFormat > 1) {
+    // Mid-series: carry scores forward
+    nextRound  = state.seriesRound + 1;
+    nextScores = state.seriesScores;
+  } else {
+    // New series (or single game): reset
+    nextRound  = 1;
+    nextScores = { [oldRoom.hostId]: 0, [oldRoom.guestId]: 0 };
+  }
+
   try {
     // Check if the other player already created a rematch room
     const existingRematchId = await getRematch(oldRoomId);
 
     if (existingRematchId) {
-      // Other player was first — just join their room
+      // Other player was first — just join their room (it already has the right series data)
       await joinRematch(existingRematchId, oldRoom);
     } else {
       // We're first — create the rematch room for both players
-      const secret  = selectSecretWord();
+      const secret = selectSecretWord();
       const { roomId } = await createRematch(
         oldRoomId,
         oldRoom.hostId,
@@ -120,6 +150,9 @@ document.getElementById('btn-play-again').addEventListener('click', async () => 
         secret,
         oldRoom.hardMode ?? false,
         oldRoom.timeLimitMs ?? DEFAULT_TIME_MS,
+        nextFormat,
+        nextRound,
+        nextScores,
       );
       await joinRematch(roomId, oldRoom);
     }
@@ -127,7 +160,7 @@ document.getElementById('btn-play-again').addEventListener('click', async () => 
     console.error(err);
     showToast('Could not start rematch. Try again.');
     btn.disabled = false;
-    btn.textContent = 'Play Again';
+    btn.textContent = state.seriesIsOver || state.seriesFormat <= 1 ? 'Play Again' : 'Next Game';
   }
 });
 
@@ -152,18 +185,20 @@ function getTimeLimitMs() {
 }
 
 async function handleCreate() {
-  const secret      = selectSecretWord();
-  const hardMode    = document.getElementById('toggle-hard').checked;
-  const timeLimitMs = getTimeLimitMs();
+  const secret       = selectSecretWord();
+  const hardMode     = document.getElementById('toggle-hard').checked;
+  const timeLimitMs  = getTimeLimitMs();
+  const seriesFormat = getSeriesFormat();
   showScreen('lobby');
   setLobbyStatus('Waiting for opponent…');
 
   try {
-    const { roomId, shortCode } = await createRoom(playerId, secret, hardMode, timeLimitMs);
-    state.roomId    = roomId;
-    state.shortCode = shortCode;
-    state.role      = 'host';
-    state.secretWord = secret;
+    const { roomId, shortCode } = await createRoom(playerId, secret, hardMode, timeLimitMs, seriesFormat);
+    state.roomId      = roomId;
+    state.shortCode   = shortCode;
+    state.role        = 'host';
+    state.secretWord  = secret;
+    state.seriesFormat = seriesFormat;
 
     showLobbyHost(shortCode);
     subscribeToRoom(roomId, onRoomUpdate);
@@ -240,9 +275,9 @@ function onRoomUpdate(snapshot) {
     return;
   }
 
-  // Host detects guest joined → activate the room
+  // Host detects guest joined → activate the room (also inits guest's series score)
   if (state.role === 'host' && room.status === 'waiting' && room.guestId) {
-    activateRoom(state.roomId).catch(console.error);
+    activateRoom(state.roomId, room.guestId).catch(console.error);
     return;
   }
 
@@ -272,6 +307,9 @@ function startGame(room) {
 
   state.hardMode     = room.hardMode ?? false;
   state.timeLimitMs  = room.timeLimitMs ?? DEFAULT_TIME_MS;
+  state.seriesFormat = room.seriesFormat ?? 1;
+  state.seriesRound  = room.seriesRound  ?? 1;
+  state.seriesScores = room.seriesScores ?? {};
   state.currentRow   = room.players?.[playerId]?.currentRow ?? 0;
   state.currentTiles = [];
   state.inputLocked  = false;
@@ -297,6 +335,15 @@ function startGame(room) {
   setGameStatus('');
   syncOpponentBoard(room);
   startTimer(room.startedAt, state.timeLimitMs);
+
+  // Series bar
+  updateSeriesBar({
+    seriesFormat: state.seriesFormat,
+    seriesRound:  state.seriesRound,
+    seriesScores: state.seriesScores,
+    selfId:       playerId,
+    opponentId:   getOpponentId(room),
+  });
 
   if (state.done) {
     state.inputLocked = true;
@@ -540,6 +587,23 @@ function showResults(room) {
         : null)
     : null;
 
+  // Compute updated series scores (add this round's result)
+  const seriesFormat = room.seriesFormat ?? 1;
+  const seriesRound  = room.seriesRound  ?? 1;
+  const oldScores    = room.seriesScores ?? {};
+  const newScores    = { ...oldScores };
+  if (room.winner) newScores[room.winner] = (newScores[room.winner] ?? 0) + 1;
+
+  const winsNeeded  = Math.ceil(seriesFormat / 2);
+  const seriesIsOver = seriesFormat <= 1 ||
+                       Object.values(newScores).some(s => s >= winsNeeded);
+
+  // Persist updated series state for the Play Again handler
+  state.seriesFormat  = seriesFormat;
+  state.seriesRound   = seriesRound;
+  state.seriesScores  = newScores;
+  state.seriesIsOver  = seriesIsOver;
+
   renderResults({
     outcome,
     secretWord:      room.secretWord,
@@ -548,7 +612,16 @@ function showResults(room) {
     timerExpired:    room.timerExpired ?? false,
     gaveUp:          room.gaveUp ?? null,
     selfId:          playerId,
+    opponentId,
+    seriesFormat,
+    seriesRound,
+    seriesScores:    newScores,
   });
+
+  // Update Play Again button label
+  const playAgainBtn = document.getElementById('btn-play-again');
+  playAgainBtn.textContent = (!seriesIsOver && seriesFormat > 1) ? 'Next Game' : 'Play Again';
+  playAgainBtn.disabled = false;
 
   stopTimer();
   showScreen('results');
@@ -563,11 +636,12 @@ async function joinRematch(newRoomId, oldRoom) {
   // Preserve role from the old room
   const newRole = oldRoom.hostId === playerId ? 'host' : 'guest';
 
-  // Reset gameplay state, keep identity
+  // Reset gameplay state; series data will be repopulated from new room via startGame
   Object.assign(state, {
     roomId: newRoomId, shortCode: null, role: newRole,
     secretWord: null, hardMode: oldRoom.hardMode ?? false,
     timeLimitMs: oldRoom.timeLimitMs ?? DEFAULT_TIME_MS,
+    seriesFormat: 1, seriesRound: 1, seriesScores: {}, seriesIsOver: true,
     guessHistory: [],
     currentRow: 0, currentTiles: [], inputLocked: false,
     done: false, opponentDone: false, lastOpponentRow: -1,
@@ -582,7 +656,9 @@ function resetState() {
   stopTimer();
   Object.assign(state, {
     roomId: null, shortCode: null, role: null, secretWord: null,
-    hardMode: false, timeLimitMs: DEFAULT_TIME_MS, guessHistory: [],
+    hardMode: false, timeLimitMs: DEFAULT_TIME_MS,
+    seriesFormat: 1, seriesRound: 1, seriesScores: {}, seriesIsOver: true,
+    guessHistory: [],
     currentRow: 0, currentTiles: [], inputLocked: false,
     done: false, opponentDone: false, lastOpponentRow: -1,
     timerInterval: null, startedAt: null, lastRoom: null,
