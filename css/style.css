@@ -203,6 +203,53 @@ h1 .vs {
   transform: translateX(18px);
 }
 
+.time-limit-row { cursor: default; }
+
+.time-limit-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.time-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.time-btn:hover { background: var(--border); }
+
+#input-time {
+  width: 52px;
+  padding: 4px 6px;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+#input-time::-webkit-inner-spin-button,
+#input-time::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+#input-time:focus { border-color: var(--text-muted); }
+
 .hard-mode-badge {
   display: inline-block;
   font-size: 0.65rem;

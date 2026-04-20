@@ -30,6 +30,26 @@
         </div>
       </label>
 
+      <div class="toggle-row time-limit-row">
+        <span class="toggle-label">
+          Time Limit
+          <span class="toggle-hint">Minutes per game (0 = no limit)</span>
+        </span>
+        <div class="time-limit-input-wrap">
+          <button class="time-btn" id="time-dec" aria-label="Decrease">−</button>
+          <input
+            id="input-time"
+            type="number"
+            min="0"
+            max="60"
+            step="1"
+            value="5"
+            aria-label="Time limit in minutes"
+          />
+          <button class="time-btn" id="time-inc" aria-label="Increase">+</button>
+        </div>
+      </div>
+
       <div class="divider"><span>or join a game</span></div>
 
       <div class="join-form">

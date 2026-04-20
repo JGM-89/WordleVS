@@ -20,7 +20,7 @@ if (!playerId) {
 }
 
 // ── App state ──────────────────────────────────────────────────────────────────
-const GAME_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_TIME_MS = 5 * 60 * 1000;
 
 const state = {
   roomId:          null,
@@ -28,6 +28,7 @@ const state = {
   role:            null,   // 'host' | 'guest'
   secretWord:      null,
   hardMode:        false,
+  timeLimitMs:     DEFAULT_TIME_MS,
   guessHistory:    [],     // { word, result }[] — own guesses so far
   currentRow:      0,
   currentTiles:    [],     // letters typed in the current row
@@ -47,6 +48,16 @@ const boardOpponent = document.getElementById('board-opponent');
 // ── Landing screen ─────────────────────────────────────────────────────────────
 
 document.getElementById('btn-create').addEventListener('click', handleCreate);
+
+// ── Time limit +/− buttons ─────────────────────────────────────────────────────
+document.getElementById('time-dec').addEventListener('click', () => {
+  const input = document.getElementById('input-time');
+  input.value = Math.max(0, (parseInt(input.value) || 0) - 1);
+});
+document.getElementById('time-inc').addEventListener('click', () => {
+  const input = document.getElementById('input-time');
+  input.value = Math.min(60, (parseInt(input.value) || 0) + 1);
+});
 document.getElementById('btn-join').addEventListener('click', handleJoin);
 document.getElementById('input-code').addEventListener('keydown', e => {
   if (e.key === 'Enter') handleJoin();
@@ -108,6 +119,7 @@ document.getElementById('btn-play-again').addEventListener('click', async () => 
         oldRoom.guestId,
         secret,
         oldRoom.hardMode ?? false,
+        oldRoom.timeLimitMs ?? DEFAULT_TIME_MS,
       );
       await joinRematch(roomId, oldRoom);
     }
@@ -134,14 +146,20 @@ document.getElementById('keyboard').addEventListener('click', e => {
 
 // ── Flow: Create Game ──────────────────────────────────────────────────────────
 
+function getTimeLimitMs() {
+  const mins = parseFloat(document.getElementById('input-time').value) || 0;
+  return mins > 0 ? Math.round(mins * 60 * 1000) : 0; // 0 = no limit
+}
+
 async function handleCreate() {
-  const secret   = selectSecretWord();
-  const hardMode = document.getElementById('toggle-hard').checked;
+  const secret      = selectSecretWord();
+  const hardMode    = document.getElementById('toggle-hard').checked;
+  const timeLimitMs = getTimeLimitMs();
   showScreen('lobby');
   setLobbyStatus('Waiting for opponent…');
 
   try {
-    const { roomId, shortCode } = await createRoom(playerId, secret, hardMode);
+    const { roomId, shortCode } = await createRoom(playerId, secret, hardMode, timeLimitMs);
     state.roomId    = roomId;
     state.shortCode = shortCode;
     state.role      = 'host';
@@ -253,6 +271,7 @@ function startGame(room) {
   initBoard(boardOpponent, true);
 
   state.hardMode     = room.hardMode ?? false;
+  state.timeLimitMs  = room.timeLimitMs ?? DEFAULT_TIME_MS;
   state.currentRow   = room.players?.[playerId]?.currentRow ?? 0;
   state.currentTiles = [];
   state.inputLocked  = false;
@@ -277,7 +296,7 @@ function startGame(room) {
   document.getElementById('btn-give-up').disabled = false;
   setGameStatus('');
   syncOpponentBoard(room);
-  startTimer(room.startedAt);
+  startTimer(room.startedAt, state.timeLimitMs);
 
   if (state.done) {
     state.inputLocked = true;
@@ -287,17 +306,24 @@ function startGame(room) {
 
 // ── Timer ──────────────────────────────────────────────────────────────────────
 
-function startTimer(startedAt) {
+function startTimer(startedAt, timeLimitMs) {
   stopTimer();
   state.startedAt = startedAt;
 
+  const el = document.getElementById('game-timer');
+
+  // No time limit — hide the timer display
+  if (!timeLimitMs) {
+    if (el) el.textContent = '∞';
+    return;
+  }
+
   function tick() {
-    const remaining = Math.max(0, GAME_DURATION_MS - (Date.now() - state.startedAt));
+    const remaining = Math.max(0, timeLimitMs - (Date.now() - state.startedAt));
     const totalSecs = Math.ceil(remaining / 1000);
     const mins = Math.floor(totalSecs / 60);
     const secs = totalSecs % 60;
 
-    const el = document.getElementById('game-timer');
     if (el) {
       el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
       el.classList.remove('warn', 'urgent');
@@ -541,6 +567,7 @@ async function joinRematch(newRoomId, oldRoom) {
   Object.assign(state, {
     roomId: newRoomId, shortCode: null, role: newRole,
     secretWord: null, hardMode: oldRoom.hardMode ?? false,
+    timeLimitMs: oldRoom.timeLimitMs ?? DEFAULT_TIME_MS,
     guessHistory: [],
     currentRow: 0, currentTiles: [], inputLocked: false,
     done: false, opponentDone: false, lastOpponentRow: -1,
@@ -555,7 +582,7 @@ function resetState() {
   stopTimer();
   Object.assign(state, {
     roomId: null, shortCode: null, role: null, secretWord: null,
-    hardMode: false, guessHistory: [],
+    hardMode: false, timeLimitMs: DEFAULT_TIME_MS, guessHistory: [],
     currentRow: 0, currentTiles: [], inputLocked: false,
     done: false, opponentDone: false, lastOpponentRow: -1,
     timerInterval: null, startedAt: null, lastRoom: null,

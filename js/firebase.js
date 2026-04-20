@@ -37,7 +37,7 @@ function generateShortCode() {
 
 // ─── Room CRUD ─────────────────────────────────────────────────────────────────
 
-export async function createRoom(hostId, secretWord, hardMode = false) {
+export async function createRoom(hostId, secretWord, hardMode = false, timeLimitMs = 300000) {
   const shortCode = generateShortCode();
 
   const roomRef  = push(ref(db, 'rooms'));
@@ -46,12 +46,13 @@ export async function createRoom(hostId, secretWord, hardMode = false) {
   await set(roomRef, {
     secretWord,
     hostId,
-    guestId:   null,
+    guestId:      null,
     shortCode,
     hardMode,
-    status:    'waiting',
-    winner:    null,
-    createdAt: Date.now(),
+    timeLimitMs,
+    status:       'waiting',
+    winner:       null,
+    createdAt:    Date.now(),
     players: {
       [hostId]: { guesses: {}, currentRow: 0, done: false },
     },
@@ -95,7 +96,7 @@ export async function activateRoom(roomId) {
   await update(ref(db, `rooms/${roomId}`), { status: 'active', startedAt: Date.now() });
 }
 
-export async function createRematch(oldRoomId, hostId, guestId, secretWord, hardMode) {
+export async function createRematch(oldRoomId, hostId, guestId, secretWord, hardMode, timeLimitMs) {
   const shortCode = generateShortCode();
   const roomRef   = push(ref(db, 'rooms'));
   const newRoomId = roomRef.key;
@@ -106,6 +107,7 @@ export async function createRematch(oldRoomId, hostId, guestId, secretWord, hard
     guestId,
     shortCode,
     hardMode:     hardMode ?? false,
+    timeLimitMs:  timeLimitMs ?? 300000,
     status:       'active',
     startedAt:    Date.now(),
     winner:       null,
